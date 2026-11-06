@@ -1,0 +1,34 @@
+def branchParam(String name, String repo) {
+  [$class: 'ChoiceParameter',
+   name: name,
+   description: "Ramas de ${repo}",
+   choiceType: 'PT_SINGLE_SELECT',
+   filterable: true,
+   filterLength: 1,
+   script: [$class: 'GroovyScript',
+     script: [classpath: [], sandbox: false,
+              script: readTrusted('shared/active-choices/branches.groovy').replace('__REPO__', repo)],
+     fallbackScript: [classpath: [], sandbox: false, script: 'return ["master"]']]]
+}
+
+properties([
+  disableConcurrentBuilds(),
+  disableResume(),
+  parameters([
+    branchParam('BRANCHIAC', 'turecibo-nosconecta-iac')
+  ])
+])
+
+pipeline {
+  agent none
+  triggers {
+    cron('H 12 15 * *')
+  }
+  stages {
+    stage('Echo') {
+      steps {
+        echo "BRANCHIAC elegido: ${params.BRANCHIAC}"
+      }
+    }
+  }
+}
