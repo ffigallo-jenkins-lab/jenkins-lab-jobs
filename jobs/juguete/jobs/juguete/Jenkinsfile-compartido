@@ -1,0 +1,60 @@
+// Jenkinsfile compartido por juguete-a y juguete-b.
+// juguete-a imita a qa-integration-up: es el único que tiene BRANCHWEBTS.
+
+def branchParam(String name, String repo) {
+  [$class: 'ChoiceParameter',
+   name: name,
+   description: "Ramas de ${repo}",
+   choiceType: 'PT_SINGLE_SELECT',
+   filterable: true,
+   filterLength: 1,
+   script: [$class: 'GroovyScript',
+     script: [classpath: [], sandbox: false,
+              script: readTrusted('shared/active-choices/branches.groovy').replace('__REPO__', repo)],
+     fallbackScript: [classpath: [], sandbox: false, script: 'return ["master"]']]]
+}
+
+// Desplegable en cascada: las opciones dependen de lo elegido en BRANCHIAC.
+def tagParam() {
+  [$class: 'CascadeChoiceParameter',
+   name: 'TAG',
+   description: 'Tags según la rama elegida en BRANCHIAC',
+   choiceType: 'PT_SINGLE_SELECT',
+   filterable: false,
+   referencedParameters: 'BRANCHIAC',
+   script: [$class: 'GroovyScript',
+     script: [classpath: [], sandbox: false,
+              script: '''if (BRANCHIAC == 'master') {
+  return ['tag-master-1', 'tag-master-2']
+}
+return ['tag-de-' + BRANCHIAC]'''],
+     fallbackScript: [classpath: [], sandbox: false, script: 'return ["sin-tag"]']]]
+}
+
+def jobParams = [
+  branchParam('BRANCHIAC', 'turecibo-nosconecta-iac'),
+  tagParam()
+]
+if (env.JOB_NAME == 'juguete-a') {
+  jobParams += [choice(name: 'BRANCHWEBTS', choices: ['none', 'master', 'otra'], description: 'Solo juguete-a (imita a qa-integration-up)')]
+}
+
+properties([
+  disableConcurrentBuilds(),
+  disableResume(),
+  parameters(jobParams)
+])
+
+pipeline {
+  agent none
+  triggers {
+    cron('H 12 15 * *')
+  }
+  stages {
+    stage('Echo') {
+      steps {
+        echo "JOB=${env.JOB_NAME} BRANCHIAC=${params.BRANCHIAC} TAG=${params.TAG} BRANCHWEBTS=${params.BRANCHWEBTS ?: 'none'}"
+      }
+    }
+  }
+}
